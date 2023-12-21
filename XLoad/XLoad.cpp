@@ -62,6 +62,7 @@ void CloseDevice();
 int ProcessLine( string s );
 int OpenDevice( uint baudrate, uint latency );
 int SetFlashDump( string filename, uint baudrate, uint flash_type );
+void Monitor(void);
 
 
 // Error messages
@@ -629,6 +630,54 @@ int PutBank( string filename ) {
     infile.close();
 
     return 0;
+}
+
+//---------------------------------------------------------------------------------------------------------------------
+// Monitor
+//---------------------------------------------------------------------------------------------------------------------
+void Monitor(void) {
+    // Just listen on the port and print whatever
+    // comes in
+    DWORD len;
+    DWORD available;
+    FT_STATUS st;
+    DWORD bufsize = 3;
+    uchar buffer[ bufsize ];
+    int count = 0;
+
+    for(;;) {
+        st = FT_GetQueueStatus( ft_port, &available );
+        if( st != FT_OK ) {
+            std::cout << "Error getting queue status." << endl;
+            return;
+        }
+        // now we know how many bytes are available
+        if( available == 0 ) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            continue;
+        }
+        else if( available > bufsize ) {
+            available = bufsize;
+        }
+        st = FT_Read( ft_port, &buffer, bufsize, &len );
+        if( st == FT_OK ) {
+            //cout << "received data: " << len << endl;
+            for( uint i = 0; i < len; ++i ) {
+                if( buffer[ i ] == NULL ) {
+                    std::cout << "null ";
+                } else {
+                    std::cout << hex << uppercase << setfill('0') << setw(2) << (int) buffer[ i ] << " ";
+                }
+                std::cout.flush();
+            }
+        }
+        if( ++count == 10) {
+            std::cout << endl;
+            count = 0;
+        }
+    }
+    
+
 }
 
 //---------------------------------------------------------------------------------------------------------------------
@@ -1353,6 +1402,9 @@ int ProcessLine( string s ) {
     else if( e == "." ) {
         GetAudioChunk( s );
     }
+
+    else if( e == "monitor" )
+        Monitor();
 
     // Help
     else if( e == "h" ) {
